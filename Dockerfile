@@ -1,4 +1,4 @@
-FROM node:14.17 as frontend-builder
+FROM node:14.17-bullseye as frontend-builder
 
 RUN npm install --global --force yarn@1.22.10
 
@@ -25,7 +25,7 @@ COPY --chown=redash client /frontend/client
 COPY --chown=redash webpack.config.js /frontend/
 RUN if [ "x$skip_frontend_build" = "x" ] ; then yarn build; else mkdir -p /frontend/client/dist && touch /frontend/client/dist/multi_org.html && touch /frontend/client/dist/index.html; fi
 
-FROM python:3.7-slim-buster
+FROM python:3.7.13-slim-bullseye
 
 EXPOSE 5000
 
@@ -36,9 +36,11 @@ ARG skip_dev_deps
 
 RUN useradd --create-home redash
 
+RUN apt update -y && apt upgrade -y && apt autoremove -y
+
 # Ubuntu packages
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
+  apt-get install -y \
     curl \
     gnupg \
     build-essential \
@@ -46,10 +48,12 @@ RUN apt-get update && \
     libffi-dev \
     sudo \
     git-core \
+    wget \
     # Postgres client
     libpq-dev \
     # ODBC support:
     g++ unixodbc-dev \
+    unixodbc \
     # for SAML
     xmlsec1 \
     # Additional packages required for data sources:
@@ -59,30 +63,26 @@ RUN apt-get update && \
     libsasl2-dev \
     unzip \
     libsasl2-modules-gssapi-mit && \
-    apt-get clean && \
-     rm -rf /var/lib/apt/lists/*
+  # MSSQL ODBC Driver:  
+  curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
+  curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
+  apt-get update && \
+  ACCEPT_EULA=Y apt-get install -y msodbcsql17 && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/*
 
-
-ARG TARGETPLATFORM
 ARG databricks_odbc_driver_url=https://databricks.com/wp-content/uploads/2.6.10.1010-2/SimbaSparkODBC-2.6.10.1010-2-Debian-64bit.zip
-RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
-    curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-    && curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list \
-    && apt-get update \
-    && ACCEPT_EULA=Y apt-get install  -y --no-install-recommends msodbcsql17 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl "$databricks_odbc_driver_url" --location --output /tmp/simba_odbc.zip \
-    && chmod 600 /tmp/simba_odbc.zip \
-    && unzip /tmp/simba_odbc.zip -d /tmp/ \
-    && dpkg -i /tmp/SimbaSparkODBC-*/*.deb \
-    && printf "[Simba]\nDriver = /opt/simba/spark/lib/64/libsparkodbc_sb64.so" >> /etc/odbcinst.ini \
-    && rm /tmp/simba_odbc.zip \
-    && rm -rf /tmp/SimbaSparkODBC*; fi
+RUN wget --quiet $databricks_odbc_driver_url -O /tmp/simba_odbc.zip \
+  && chmod 600 /tmp/simba_odbc.zip \
+  && unzip /tmp/simba_odbc.zip -d /tmp/ \
+  && dpkg -i /tmp/SimbaSparkODBC-*/*.deb \
+  && echo "[Simba]\nDriver = /opt/simba/spark/lib/64/libsparkodbc_sb64.so" >> /etc/odbcinst.ini \
+  && rm /tmp/simba_odbc.zip \
+  && rm -rf /tmp/SimbaSparkODBC*
 
 WORKDIR /app
 
-# Disable PIP Cache and Version Check
+# Disalbe PIP Cache and Version Check
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
 
@@ -99,9 +99,9 @@ RUN if [ "x$skip_dev_deps" = "x" ] ; then pip install -r requirements_dev.txt ; 
 COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
-COPY --chown=redash . /app
-COPY --from=frontend-builder --chown=redash /frontend/client/dist /app/client/dist
-RUN chown redash /app
+COPY . /app
+COPY --from=frontend-builder /frontend/client/dist /app/client/dist
+RUN chown -R redash /app
 USER redash
 
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
