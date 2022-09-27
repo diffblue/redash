@@ -1,4 +1,4 @@
-FROM node:14.17 as frontend-builder
+FROM node:14.17-bullseye as frontend-builder
 
 RUN npm install --global --force yarn@1.22.10
 
@@ -25,7 +25,7 @@ COPY --chown=redash client /frontend/client
 COPY --chown=redash webpack.config.js /frontend/
 RUN if [ "x$skip_frontend_build" = "x" ] ; then yarn build; else mkdir -p /frontend/client/dist && touch /frontend/client/dist/multi_org.html && touch /frontend/client/dist/index.html; fi
 
-FROM python:3.7-slim-buster
+FROM python:3.7.13-slim-bullseye
 
 EXPOSE 5000
 
@@ -35,6 +35,8 @@ ARG skip_ds_deps
 ARG skip_dev_deps
 
 RUN useradd --create-home redash
+
+RUN apt update -y && apt upgrade -y && apt autoremove -y
 
 # Ubuntu packages
 RUN apt-get update && \
@@ -50,6 +52,7 @@ RUN apt-get update && \
     libpq-dev \
     # ODBC support:
     g++ unixodbc-dev \
+    unixodbc \
     # for SAML
     xmlsec1 \
     # Additional packages required for data sources:
