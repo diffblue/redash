@@ -55,7 +55,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get autoremove -y && \
     xmlsec1 \
     # Additional packages required for data sources:
     libssl-dev \
-    default-libmysqlclient-dev \
     freetds-dev \
     libsasl2-dev \
     unzip \
