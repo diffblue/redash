@@ -27,7 +27,7 @@ jobs:
           tags: |
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=raw,value=10.1.1,enable=${{ github.ref == format('refs/heads/release/{0}', '10.0.x') }}
-            type=raw,event=pr,value=dev
+            type=raw,value=dev,enable=${{ github.ref != format('refs/heads/{0}', 'master') && github.ref != format('refs/heads/release/{0}', '10.0.x') }}
       - name: Log in to Docker Hub
         uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
         with:
