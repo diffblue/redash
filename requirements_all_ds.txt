@@ -18,7 +18,7 @@ thrift_sasl>=0.1.0
 atsd_client==3.0.5
 simple_salesforce==0.74.3
 PyAthena>=1.5.0
-pymapd==0.26.0
+pyomnisci==0.28.2
 qds-sdk>=1.9.6
 pydruid==0.5.7
 requests_aws_sign==0.1.5
