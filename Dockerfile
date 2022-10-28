@@ -27,6 +27,24 @@ FROM --platform=amd64 registry.access.redhat.com/ubi9/python-39
 
 EXPOSE 5000
 
+ENV SUMMARY="Redash - data visualisation" \
+    DESCRIPTION="Redash is a data visualisation web application, connect data \
+        sources and embed visualisations in dashboards."
+
+LABEL summary="$SUMMARY" \
+      description="$DESCRIPTION" \
+      io.k8s.description="$DESCRIPTION" \
+      io.k8s.display-name="Redash" \
+      io.openshift.expose-services="5000:http" \
+      io.openshift.tags="redash" \
+      com.redhat.component="" \
+      name="diffblue/redash" \
+      version="1" \
+      usage="" \
+      com.redhat.license_terms="https://www.redhat.com/en/about/red-hat-end-user-license-agreements#UBI" \
+      io.buildpacks.stack.id="com.diffblue.cover-reports.redash" \
+      maintainer="Diffblue <support@diffblue.com>"
+
 # Controls whether to install extra dependencies needed for all data sources.
 ARG skip_ds_deps
 # Controls whether to install dev dependencies.
