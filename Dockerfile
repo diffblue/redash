@@ -58,7 +58,7 @@ RUN yum install --assumeyes \
 USER $CNB_USER_ID
 WORKDIR /app
 
-# Disalbe PIP Cache and Version Check
+# Disable pip cache and version check
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
 
