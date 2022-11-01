@@ -23,62 +23,42 @@ COPY --chown=redash client /frontend/client
 COPY --chown=redash webpack.config.js /frontend/
 RUN if [ "x$skip_frontend_build" = "x" ] ; then npm run build; else mkdir -p /frontend/client/dist && touch /frontend/client/dist/multi_org.html && touch /frontend/client/dist/index.html; fi
 
-FROM --platform=amd64 python:3.8.14-slim-bullseye
+FROM --platform=amd64 registry.access.redhat.com/ubi9/python-39
 
 EXPOSE 5000
+
+ENV SUMMARY="Redash - data visualisation" \
+    DESCRIPTION="Redash is a data visualisation web application, connect data \
+        sources and embed visualisations in dashboards."
+
+LABEL summary="$SUMMARY" \
+      description="$DESCRIPTION" \
+      io.k8s.description="$DESCRIPTION" \
+      io.k8s.display-name="Redash" \
+      io.openshift.expose-services="5000:http" \
+      io.openshift.tags="redash" \
+      com.redhat.component="" \
+      name="diffblue/redash" \
+      version="1" \
+      usage="" \
+      com.redhat.license_terms="https://www.redhat.com/en/about/red-hat-end-user-license-agreements#UBI" \
+      io.buildpacks.stack.id="com.diffblue.cover-reports.redash" \
+      maintainer="Diffblue <support@diffblue.com>"
 
 # Controls whether to install extra dependencies needed for all data sources.
 ARG skip_ds_deps
 # Controls whether to install dev dependencies.
 ARG skip_dev_deps
 
-RUN useradd --create-home redash
+USER root
+RUN yum install --assumeyes \
+    postgresql
 
-
-# Ubuntu packages
-RUN apt-get update && apt-get upgrade -y && apt-get autoremove -y && \
-  apt-get install -y \
-    curl \
-    gnupg \
-    build-essential \
-    pwgen \
-    libffi-dev \
-    sudo \
-    git-core \
-    wget \
-    # Postgres client
-    libpq-dev \
-    # ODBC support:
-    g++ unixodbc-dev \
-    unixodbc \
-    # for SAML
-    xmlsec1 \
-    # Additional packages required for data sources:
-    libssl-dev \
-    freetds-dev \
-    libsasl2-dev \
-    unzip \
-    libsasl2-modules-gssapi-mit && \
-  # MSSQL ODBC Driver:
-  curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - && \
-  curl https://packages.microsoft.com/config/debian/10/prod.list > /etc/apt/sources.list.d/mssql-release.list && \
-  apt-get update && \
-  ACCEPT_EULA=Y apt-get install -y msodbcsql17 && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/*
-
-ARG databricks_odbc_driver_url=https://databricks.com/wp-content/uploads/2.6.10.1010-2/SimbaSparkODBC-2.6.10.1010-2-Debian-64bit.zip
-RUN wget --quiet $databricks_odbc_driver_url -O /tmp/simba_odbc.zip \
-  && chmod 600 /tmp/simba_odbc.zip \
-  && unzip /tmp/simba_odbc.zip -d /tmp/ \
-  && dpkg -i /tmp/SimbaSparkODBC-*/*.deb \
-  && echo "[Simba]\nDriver = /opt/simba/spark/lib/64/libsparkodbc_sb64.so" >> /etc/odbcinst.ini \
-  && rm /tmp/simba_odbc.zip \
-  && rm -rf /tmp/SimbaSparkODBC*
-
+# This variable is part of the base UBI image
+USER $CNB_USER_ID
 WORKDIR /app
 
-# Disalbe PIP Cache and Version Check
+# Disable pip cache and version check
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_NO_CACHE_DIR=1
 
@@ -97,8 +77,6 @@ RUN pip install -r requirements.txt
 
 COPY . /app
 COPY --from=frontend-builder /frontend/client/dist /app/client/dist
-RUN chown -R redash /app
-USER redash
 
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
 CMD ["server"]
