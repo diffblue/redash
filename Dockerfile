@@ -1,3 +1,26 @@
+# syntax=docker/dockerfile:1
+
+## Redash
+# This build file has four stages as outlined below:
+#
+# 1. frontend-builder, used to build the node front-end
+# 2. ubi, a base image sitting on top of rhel9
+# 3. debian, a base image sitting on top of debian bullseye
+# 4. redash, the python application (with the front-end copied to it)
+#
+# The first image -- the `frontend-builder` -- is not distributed as part of the application. It's simply there to allow
+# for caching and to avoid unnecessarily inflating the final image with all the node application's dependencies.
+# The next two images -- the `ubi` and `debian` images -- are the base operating system images. Any dependencies that
+# the redash application requires must be installed in these layers. By using the `base` build-arg (described below)
+# we can switch out the underlying operating system at build time.
+# The final image -- `redash` -- contains the python application. This image is the one that's distributed on
+# hub.docker.com
+
+# Controls the base operating system, either ubi (and thus registry.access.redhat.com/ubi9) as the base,
+# or debian (and thus python:3.8.14-slim-bullseye).
+# Set on the command line via `docker build --build-arg base=debian`
+ARG base=ubi
+
 FROM node:14.17-bullseye as frontend-builder
 
 # Controls whether to build the frontend assets
@@ -23,7 +46,7 @@ COPY --chown=redash client /frontend/client
 COPY --chown=redash webpack.config.js /frontend/
 RUN if [ "x$skip_frontend_build" = "x" ] ; then npm run build; else mkdir -p /frontend/client/dist && touch /frontend/client/dist/multi_org.html && touch /frontend/client/dist/index.html; fi
 
-FROM --platform=amd64 registry.access.redhat.com/ubi9/python-39
+FROM --platform=amd64 registry.access.redhat.com/ubi9/python-39 as ubi
 USER root
 RUN yum install --assumeyes \
       postgresql
@@ -31,6 +54,34 @@ RUN yum install --assumeyes \
 # This variable is part of the base UBI image
 USER $CNB_USER_ID
 
+FROM --platform=amd64 python:3.8.14-slim-bullseye as debian
+
+USER root
+RUN apt-get update &&\
+  apt-get upgrade -y && \
+  apt-get autoremove -y && \
+  apt-get install -y \
+    curl \
+    gnupg \
+    build-essential \
+    pwgen \
+    libffi-dev \
+    sudo \
+    git-core \
+    wget \
+    # Postgres client
+    libpq-dev \
+    # Additional packages required for data sources:
+    libssl-dev \
+    freetds-dev \
+    libsasl2-dev \
+    unzip \
+    libsasl2-modules-gssapi-mit
+
+RUN useradd --create-home redash
+USER redash
+
+FROM $base as redash
 
 EXPOSE 5000
 # Controls whether to install extra dependencies needed for all data sources.
