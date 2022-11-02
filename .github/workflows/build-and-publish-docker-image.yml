@@ -15,8 +15,14 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      - name: Log in to Docker Hub
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Extract redhat/ubi metadata (tags, labels) for Docker
+        id: meta-ubi
         uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
         with:
           images: |
@@ -28,18 +34,35 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=raw,value=10.1.1,enable=${{ github.ref == format('refs/heads/release/{0}', '10.0.x') }}
             type=raw,value=10.1.1-ubi,enable=${{ github.ref == format('refs/heads/release/{0}', '10.0.x') }}
-            type=raw,value=10.1.1-ubi9,enable=${{ github.ref == format('refs/heads/release/{0}', '10.0.x') }}
-            type=raw,value=dev,enable=${{ github.ref != format('refs/heads/{0}', 'master') && github.ref != format('refs/heads/release/{0}', '10.0.x') }}
-      - name: Log in to Docker Hub
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+            type=raw,value=dev-latest,enable=${{ github.ref != format('refs/heads/{0}', 'master') && github.ref != format('refs/heads/release/{0}', '10.0.x') }}
+            type=raw,value=dev-ubi,enable=${{ github.ref != format('refs/heads/{0}', 'master') && github.ref != format('refs/heads/release/{0}', '10.0.x') }}
 
-      - name: Build and push Docker image
+      - name: Build and push RedHat (ubi) Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
           context: .
           push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta-ubi.outputs.labels }}
+          tags: ${{ steps.meta-ubi.outputs.tags }}
+          build-args: base=ubi
+
+      - name: Extract debian metadata (tags, labels) for Docker
+        id: meta-debian
+        uses: docker/metadata-action@69f6fc9d46f2f8bf0d5491e4aabe0bb8c6a4678a
+        with:
+          images: |
+            diffblue/redash
+          flavor: |
+            latest=false
+            suffix=.{{sha}},onlatest=false
+          tags: |
+            type=raw,value=10.1.1-debian,enable=${{ github.ref == format('refs/heads/release/{0}', '10.0.x') }}
+            type=raw,value=dev-debian,enable=${{ github.ref != format('refs/heads/{0}', 'master') && github.ref != format('refs/heads/release/{0}', '10.0.x') }}
+      - name: Build and push Debian (bullseye) Docker image
+        uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+        with:
+          context: .
+          push: true
+          labels: ${{ steps.meta-debian.outputs.labels }}
+          tags: ${{ steps.meta-debian.outputs.tags }}
+          build-args: base=debian
