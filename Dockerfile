@@ -129,5 +129,12 @@ LABEL summary="$SUMMARY" \
       maintainer="$MAINTAINER" \
       org.opencontainers.image.authors="$MAINTAINER"
 
+# There are three paths we need to prepend to the PATH.
+# `/opt/app-root/bin` and `/opt/app-root/src/.local/bin/` are for redhat/ubi, while `/home/redash/.local/bin/` is for
+# debian. These are needed to point to `gunicorn` (which runs the server for the flask app and thus redash). With out
+# these there is no server and the container will not start. Ideally, they'd be specified in each of the containers
+# and we'd not cross polinate, however, when we create the underlying images we've not yet installed pip, let alone
+# gunicorn.
+ENV PATH=/home/redash/.local/bin/:/opt/app-root/bin:/opt/app-root/src/.local/bin/:${PATH}
 ENTRYPOINT ["/app/bin/docker-entrypoint"]
 CMD ["server"]
