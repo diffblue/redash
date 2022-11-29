@@ -1,7 +1,7 @@
 import { find } from "lodash";
 import debug from "debug";
 import recordEvent from "@/services/recordEvent";
-import redashIconUrl from "@/assets/images/redash_icon_small.png";
+import redashIconUrl from "@/assets/images/diffblue-logo-white-100-32.png";
 
 const logger = debug("redash:notifications");
 
